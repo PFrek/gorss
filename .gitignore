@@ -1,2 +1,5 @@
 .env
 out
+access_db.sh
+reset_db.sh
+

@@ -3,7 +3,23 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+
+	"github.com/PFrek/gorss/internal/database"
 )
+
+type ApiConfig struct {
+	DB *database.Queries
+}
+
+func extractBody(req *http.Request, v any) error {
+	decoder := json.NewDecoder(req.Body)
+	err := decoder.Decode(v)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
 
 func respondWithJSON(w http.ResponseWriter, code int, payload interface{}) {
 	data, err := json.Marshal(payload)
