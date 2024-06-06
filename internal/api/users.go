@@ -1,7 +1,6 @@
 package api
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"time"
@@ -23,8 +22,9 @@ func (config *ApiConfig) PostUsersHandler(w http.ResponseWriter, req *http.Reque
 		return
 	}
 
+	ctx := req.Context()
 	currentTime := time.Now().UTC()
-	user, err := config.DB.CreateUser(context.Background(), database.CreateUserParams{
+	user, err := config.DB.CreateUser(ctx, database.CreateUserParams{
 		ID:        uuid.New(),
 		CreatedAt: currentTime,
 		UpdatedAt: currentTime,

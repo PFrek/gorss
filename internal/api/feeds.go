@@ -1,7 +1,6 @@
 package api
 
 import (
-	"context"
 	"net/http"
 	"time"
 
@@ -22,8 +21,9 @@ func (config *ApiConfig) PostFeedsHandler(w http.ResponseWriter, req *http.Reque
 		return
 	}
 
+	ctx := req.Context()
 	currentTime := time.Now().UTC()
-	feed, err := config.DB.CreateFeed(context.Background(), database.CreateFeedParams{
+	feed, err := config.DB.CreateFeed(ctx, database.CreateFeedParams{
 		ID:        uuid.New(),
 		CreatedAt: currentTime,
 		UpdatedAt: currentTime,

@@ -1,7 +1,6 @@
 package api
 
 import (
-	"context"
 	"errors"
 	"net/http"
 	"strings"
@@ -42,7 +41,9 @@ func (config *ApiConfig) MiddleWareAuth(handler authedHandler) http.HandlerFunc 
 			return
 		}
 
-		user, err := config.DB.GetUser(context.Background(), auth.Key)
+		ctx := req.Context()
+
+		user, err := config.DB.GetUser(ctx, auth.Key)
 		if err != nil {
 			respondWithError(w, 404, "Not found")
 			return
