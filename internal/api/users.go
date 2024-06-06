@@ -37,3 +37,19 @@ func (config *ApiConfig) PostUsersHandler(w http.ResponseWriter, req *http.Reque
 
 	respondWithJSON(w, 201, user)
 }
+
+func (config *ApiConfig) GetCurrentUserHandler(w http.ResponseWriter, req *http.Request) {
+	auth, err := getAuthorization(req)
+	if err != nil || !auth.isValidApiKey() {
+		respondWithError(w, 401, "Unauthorized")
+		return
+	}
+
+	user, err := config.DB.GetUser(context.Background(), auth.Key)
+	if err != nil {
+		respondWithError(w, 404, "Not found")
+		return
+	}
+
+	respondWithJSON(w, 200, user)
+}
