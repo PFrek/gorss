@@ -42,6 +42,7 @@ func main() {
 	mux.HandleFunc("GET /v1/users", apiConfig.MiddleWareAuth(apiConfig.GetCurrentUserHandler))
 
 	mux.HandleFunc("POST /v1/feeds", apiConfig.MiddleWareAuth(apiConfig.PostFeedsHandler))
+	mux.HandleFunc("GET /v1/feeds", apiConfig.GetFeedsHandler)
 
 	log.Printf("Starting server on port %s\n", port)
 	server.ListenAndServe()
