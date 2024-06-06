@@ -1,9 +1,12 @@
 package api
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strings"
+
+	"github.com/PFrek/gorss/internal/database"
 )
 
 type Authorization struct {
@@ -27,4 +30,24 @@ func getAuthorization(req *http.Request) (Authorization, error) {
 		Label: parts[0],
 		Key:   parts[1],
 	}, nil
+}
+
+type authedHandler func(http.ResponseWriter, *http.Request, database.User)
+
+func (config *ApiConfig) MiddleWareAuth(handler authedHandler) http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		auth, err := getAuthorization(req)
+		if err != nil || !auth.isValidApiKey() {
+			respondWithError(w, 401, "Unauthorized")
+			return
+		}
+
+		user, err := config.DB.GetUser(context.Background(), auth.Key)
+		if err != nil {
+			respondWithError(w, 404, "Not found")
+			return
+		}
+
+		handler(w, req, user)
+	})
 }

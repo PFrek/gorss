@@ -39,7 +39,9 @@ func main() {
 	mux.HandleFunc("GET /v1/err", api.GetErrorHandler)
 
 	mux.HandleFunc("POST /v1/users", apiConfig.PostUsersHandler)
-	mux.HandleFunc("GET /v1/users", apiConfig.GetCurrentUserHandler)
+	mux.HandleFunc("GET /v1/users", apiConfig.MiddleWareAuth(apiConfig.GetCurrentUserHandler))
+
+	mux.HandleFunc("POST /v1/feeds", apiConfig.MiddleWareAuth(apiConfig.PostFeedsHandler))
 
 	log.Printf("Starting server on port %s\n", port)
 	server.ListenAndServe()
