@@ -10,6 +10,15 @@ import (
 	"github.com/lib/pq"
 )
 
+type ResponseFeed struct {
+	ID        uuid.UUID `json:"id"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	Name      string    `json:"name"`
+	Url       string    `json:"url"`
+	UserID    uuid.UUID `json:"user_id"`
+}
+
 func (config *ApiConfig) PostFeedsHandler(w http.ResponseWriter, req *http.Request, user database.User) {
 	type parameters struct {
 		Name string `json:"name"`
@@ -44,7 +53,43 @@ func (config *ApiConfig) PostFeedsHandler(w http.ResponseWriter, req *http.Reque
 		return
 	}
 
-	respondWithJSON(w, 201, feed)
+	responseFeed := ResponseFeed{
+		ID:        feed.ID,
+		CreatedAt: feed.CreatedAt,
+		UpdatedAt: feed.UpdatedAt,
+		Name:      feed.Name,
+		Url:       feed.Url,
+		UserID:    feed.UserID,
+	}
+
+	feedFollow, err := config.DB.CreateFeedFollow(ctx, database.CreateFeedFollowParams{
+		ID:        uuid.New(),
+		CreatedAt: currentTime,
+		UpdatedAt: currentTime,
+		FeedID:    feed.ID,
+		UserID:    user.ID,
+	})
+	if err != nil {
+		respondWithError(w, 500, fmt.Sprintf("Failed to create feed follow: %v", err))
+		return
+	}
+
+	responseFeedFollow := ResponseFeedFollow{
+		ID:        feedFollow.ID,
+		CreatedAt: feedFollow.CreatedAt,
+		UpdatedAt: feedFollow.UpdatedAt,
+		FeedID:    feedFollow.FeedID,
+		UserID:    feedFollow.UserID,
+	}
+
+	response := struct {
+		Feed       ResponseFeed       `json:"feed"`
+		FeedFollow ResponseFeedFollow `json:"feed_follow"`
+	}{
+		Feed:       responseFeed,
+		FeedFollow: responseFeedFollow,
+	}
+	respondWithJSON(w, 201, response)
 }
 
 func (config *ApiConfig) GetFeedsHandler(w http.ResponseWriter, req *http.Request) {
@@ -55,5 +100,16 @@ func (config *ApiConfig) GetFeedsHandler(w http.ResponseWriter, req *http.Reques
 		return
 	}
 
-	respondWithJSON(w, 200, feeds)
+	response := []ResponseFeed{}
+	for _, feed := range feeds {
+		response = append(response, ResponseFeed{
+			ID:        feed.ID,
+			CreatedAt: feed.CreatedAt,
+			UpdatedAt: feed.UpdatedAt,
+			Name:      feed.Name,
+			Url:       feed.Url,
+			UserID:    feed.UserID,
+		})
+	}
+	respondWithJSON(w, 200, response)
 }

@@ -9,6 +9,14 @@ import (
 	"github.com/google/uuid"
 )
 
+type ResponseUser struct {
+	ID        uuid.UUID `json:"id"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	Name      string    `json:"name"`
+	ApiKey    string    `json:"api_key"`
+}
+
 func (config *ApiConfig) PostUsersHandler(w http.ResponseWriter, req *http.Request) {
 	type parameters struct {
 		Name string `json:"name"`
@@ -35,9 +43,23 @@ func (config *ApiConfig) PostUsersHandler(w http.ResponseWriter, req *http.Reque
 		return
 	}
 
-	respondWithJSON(w, 201, user)
+	response := ResponseUser{
+		ID:        user.ID,
+		CreatedAt: user.CreatedAt,
+		UpdatedAt: user.UpdatedAt,
+		Name:      user.Name,
+		ApiKey:    user.ApiKey,
+	}
+	respondWithJSON(w, 201, response)
 }
 
 func (config *ApiConfig) GetCurrentUserHandler(w http.ResponseWriter, req *http.Request, user database.User) {
-	respondWithJSON(w, 200, user)
+	response := ResponseUser{
+		ID:        user.ID,
+		CreatedAt: user.CreatedAt,
+		UpdatedAt: user.UpdatedAt,
+		Name:      user.Name,
+		ApiKey:    user.ApiKey,
+	}
+	respondWithJSON(w, 200, response)
 }

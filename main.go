@@ -44,6 +44,10 @@ func main() {
 	mux.HandleFunc("POST /v1/feeds", apiConfig.MiddleWareAuth(apiConfig.PostFeedsHandler))
 	mux.HandleFunc("GET /v1/feeds", apiConfig.GetFeedsHandler)
 
+	mux.HandleFunc("POST /v1/feed_follows", apiConfig.MiddleWareAuth(apiConfig.PostFeedFollowsHandler))
+	mux.HandleFunc("DELETE /v1/feed_follows/{feedFollowID}", apiConfig.MiddleWareAuth(apiConfig.DeleteFeedFollowHandler))
+	mux.HandleFunc("GET /v1/feed_follows", apiConfig.MiddleWareAuth(apiConfig.GetFeedFollowsHandler))
+
 	log.Printf("Starting server on port %s\n", port)
 	server.ListenAndServe()
 }
