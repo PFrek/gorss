@@ -5,9 +5,11 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/PFrek/gorss/internal/api"
 	"github.com/PFrek/gorss/internal/database"
+	"github.com/PFrek/gorss/internal/scraper"
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 )
@@ -27,6 +29,14 @@ func main() {
 	apiConfig := api.ApiConfig{
 		DB: dbQueries,
 	}
+
+	// Scraper
+	scraper := scraper.Scraper{
+		Config:        apiConfig,
+		Cache:         make(map[string]scraper.FeedData),
+		CacheInterval: 60 * time.Second,
+	}
+	scraper.Start(10*time.Second, 1)
 
 	mux := http.NewServeMux()
 
@@ -50,4 +60,5 @@ func main() {
 
 	log.Printf("Starting server on port %s\n", port)
 	server.ListenAndServe()
+
 }
