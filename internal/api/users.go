@@ -17,6 +17,16 @@ type ResponseUser struct {
 	ApiKey    string    `json:"api_key"`
 }
 
+func userFromDBUser(user database.User) ResponseUser {
+	return ResponseUser{
+		ID:        user.ID,
+		CreatedAt: user.CreatedAt,
+		UpdatedAt: user.UpdatedAt,
+		Name:      user.Name,
+		ApiKey:    user.ApiKey,
+	}
+}
+
 func (config *ApiConfig) PostUsersHandler(w http.ResponseWriter, req *http.Request) {
 	type parameters struct {
 		Name string `json:"name"`
@@ -43,23 +53,11 @@ func (config *ApiConfig) PostUsersHandler(w http.ResponseWriter, req *http.Reque
 		return
 	}
 
-	response := ResponseUser{
-		ID:        user.ID,
-		CreatedAt: user.CreatedAt,
-		UpdatedAt: user.UpdatedAt,
-		Name:      user.Name,
-		ApiKey:    user.ApiKey,
-	}
+	response := userFromDBUser(user)
 	respondWithJSON(w, 201, response)
 }
 
 func (config *ApiConfig) GetCurrentUserHandler(w http.ResponseWriter, req *http.Request, user database.User) {
-	response := ResponseUser{
-		ID:        user.ID,
-		CreatedAt: user.CreatedAt,
-		UpdatedAt: user.UpdatedAt,
-		Name:      user.Name,
-		ApiKey:    user.ApiKey,
-	}
+	response := userFromDBUser(user)
 	respondWithJSON(w, 200, response)
 }

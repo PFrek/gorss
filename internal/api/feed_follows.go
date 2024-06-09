@@ -18,6 +18,16 @@ type ResponseFeedFollow struct {
 	UserID    uuid.UUID `json:"user_id"`
 }
 
+func feedFollowFromDBFeedFollow(feedFollow database.FeedFollow) ResponseFeedFollow {
+	return ResponseFeedFollow{
+		ID:        feedFollow.ID,
+		CreatedAt: feedFollow.CreatedAt,
+		UpdatedAt: feedFollow.UpdatedAt,
+		FeedID:    feedFollow.FeedID,
+		UserID:    feedFollow.UserID,
+	}
+}
+
 func (config *ApiConfig) PostFeedFollowsHandler(w http.ResponseWriter, req *http.Request, user database.User) {
 	type parameters struct {
 		FeedId uuid.UUID `json:"feed_id"`
@@ -58,13 +68,7 @@ func (config *ApiConfig) PostFeedFollowsHandler(w http.ResponseWriter, req *http
 		return
 	}
 
-	response := ResponseFeedFollow{
-		ID:        feedFollow.ID,
-		CreatedAt: feedFollow.CreatedAt,
-		UpdatedAt: feedFollow.UpdatedAt,
-		FeedID:    feedFollow.FeedID,
-		UserID:    feedFollow.UserID,
-	}
+	response := feedFollowFromDBFeedFollow(feedFollow)
 	respondWithJSON(w, 201, response)
 }
 
@@ -108,13 +112,7 @@ func (config *ApiConfig) GetFeedFollowsHandler(w http.ResponseWriter, req *http.
 
 	response := []ResponseFeedFollow{}
 	for _, feedFollow := range feedFollows {
-		response = append(response, ResponseFeedFollow{
-			ID:        feedFollow.ID,
-			CreatedAt: feedFollow.CreatedAt,
-			UpdatedAt: feedFollow.UpdatedAt,
-			FeedID:    feedFollow.FeedID,
-			UserID:    feedFollow.UserID,
-		})
+		response = append(response, feedFollowFromDBFeedFollow(feedFollow))
 	}
 
 	respondWithJSON(w, 200, response)

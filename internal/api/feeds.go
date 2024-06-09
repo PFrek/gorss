@@ -11,12 +11,30 @@ import (
 )
 
 type ResponseFeed struct {
-	ID        uuid.UUID `json:"id"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-	Name      string    `json:"name"`
-	Url       string    `json:"url"`
-	UserID    uuid.UUID `json:"user_id"`
+	ID            uuid.UUID  `json:"id"`
+	CreatedAt     time.Time  `json:"created_at"`
+	UpdatedAt     time.Time  `json:"updated_at"`
+	Name          string     `json:"name"`
+	Url           string     `json:"url"`
+	UserID        uuid.UUID  `json:"user_id"`
+	LastFetchedAt *time.Time `json:"last_fetched_at"`
+}
+
+func feedFromDBFeed(feed database.Feed) ResponseFeed {
+	var lastFetch *time.Time
+	if feed.LastFetchedAt.Valid {
+		lastFetch = new(time.Time)
+		*lastFetch = feed.LastFetchedAt.Time
+	}
+	return ResponseFeed{
+		ID:            feed.ID,
+		CreatedAt:     feed.CreatedAt,
+		UpdatedAt:     feed.UpdatedAt,
+		Name:          feed.Name,
+		Url:           feed.Url,
+		UserID:        feed.UserID,
+		LastFetchedAt: lastFetch,
+	}
 }
 
 func (config *ApiConfig) PostFeedsHandler(w http.ResponseWriter, req *http.Request, user database.User) {
@@ -53,14 +71,7 @@ func (config *ApiConfig) PostFeedsHandler(w http.ResponseWriter, req *http.Reque
 		return
 	}
 
-	responseFeed := ResponseFeed{
-		ID:        feed.ID,
-		CreatedAt: feed.CreatedAt,
-		UpdatedAt: feed.UpdatedAt,
-		Name:      feed.Name,
-		Url:       feed.Url,
-		UserID:    feed.UserID,
-	}
+	responseFeed := feedFromDBFeed(feed)
 
 	feedFollow, err := config.DB.CreateFeedFollow(ctx, database.CreateFeedFollowParams{
 		ID:        uuid.New(),
@@ -102,14 +113,7 @@ func (config *ApiConfig) GetFeedsHandler(w http.ResponseWriter, req *http.Reques
 
 	response := []ResponseFeed{}
 	for _, feed := range feeds {
-		response = append(response, ResponseFeed{
-			ID:        feed.ID,
-			CreatedAt: feed.CreatedAt,
-			UpdatedAt: feed.UpdatedAt,
-			Name:      feed.Name,
-			Url:       feed.Url,
-			UserID:    feed.UserID,
-		})
+		response = append(response, feedFromDBFeed(feed))
 	}
 	respondWithJSON(w, 200, response)
 }
