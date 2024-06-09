@@ -14,3 +14,10 @@ WHERE id = $1;
 SELECT * FROM feeds
 ORDER BY last_fetched_at DESC
 LIMIT $1;
+
+-- name: MarkFeedFetched :one
+UPDATE feeds
+SET last_fetched_at = TIMEZONE('utc', NOW()),
+updated_at = TIMEZONE('utc', NOW())
+WHERE id = $1
+RETURNING *;
