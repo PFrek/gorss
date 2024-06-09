@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+
+	"github.com/PFrek/gorss/internal/api"
 )
 
 type FeedItem struct {
@@ -41,4 +43,8 @@ func parseXML(xmlData io.Reader) (FeedData, error) {
 	}
 
 	return feedData, nil
+}
+
+func StartScraper(config api.ApiConfig) {
+
 }
