@@ -33,10 +33,10 @@ func main() {
 	// Scraper
 	scraper := scraper.Scraper{
 		Config:        apiConfig,
-		Cache:         make(map[string]scraper.FeedData),
+		Cache:         make(map[string]scraper.CachedFeed),
 		CacheInterval: 30 * time.Minute,
 	}
-	scraper.Start(60*time.Second, 10)
+	scraper.Start(10*time.Second, 2)
 
 	mux := http.NewServeMux()
 

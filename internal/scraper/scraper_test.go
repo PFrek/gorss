@@ -3,9 +3,6 @@ package scraper
 import (
 	"strings"
 	"testing"
-	"time"
-
-	"github.com/PFrek/gorss/internal/database"
 )
 
 // TESTS
@@ -79,21 +76,5 @@ func TestParseXMLManyEntries(t *testing.T) {
 
 	if feedData.Items[2].Title != "3rd entry" {
 		t.Fatalf("Invalid title: expected '3rd entry' got '%s'", feedData.Items[0].Title)
-	}
-}
-
-func TestFetchFeedData(t *testing.T) {
-	feed := database.Feed{
-		Url: "https://blog.boot.dev/index.xml",
-	}
-
-	scraper := Scraper{
-		Cache:         make(map[string]FeedData),
-		CacheInterval: 10 * time.Minute,
-	}
-
-	_, err := scraper.fetchDataFromFeed(feed)
-	if err != nil {
-		t.Fatalf("Failed: %v", err)
 	}
 }

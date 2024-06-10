@@ -2,6 +2,7 @@ package scraper
 
 import (
 	"context"
+	"database/sql"
 	"encoding/xml"
 	"errors"
 	"fmt"
@@ -13,13 +14,16 @@ import (
 
 	"github.com/PFrek/gorss/internal/api"
 	"github.com/PFrek/gorss/internal/database"
+	"github.com/google/uuid"
+	"github.com/lib/pq"
 )
 
 type FeedItem struct {
-	XMLName xml.Name `xml:"item"`
-	Title   string   `xml:"title"`
-	Link    string   `xml:"link"`
-	PubDate string   `xml:"pubDate"`
+	XMLName     xml.Name `xml:"item"`
+	Title       string   `xml:"title"`
+	Link        string   `xml:"link"`
+	Description *string  `xml:"description"`
+	PubDate     string   `xml:"pubDate"`
 }
 
 type FeedData struct {
@@ -27,33 +31,75 @@ type FeedData struct {
 	Items   []FeedItem `xml:"channel>item"`
 }
 
-type Scraper struct {
-	Config        api.ApiConfig
-	Cache         map[string]FeedData
-	CacheInterval time.Duration
+type CachedFeed struct {
+	Data         FeedData
+	LastCachedAt time.Time
 }
 
-func (scraper Scraper) shouldFetch(feed database.Feed) bool {
+type CacheHitError struct{}
+
+func (e CacheHitError) Error() string {
+	return "Cache hit"
+}
+
+type Scraper struct {
+	Config        api.ApiConfig
+	Cache         map[string]CachedFeed
+	CacheInterval time.Duration
+	mux           sync.Mutex
+}
+
+func (s *Scraper) shouldFetch(feed database.Feed) bool {
 	if !feed.LastFetchedAt.Valid {
 		return true
 	}
 
-	return time.Since(feed.LastFetchedAt.Time) >= scraper.CacheInterval
+	cachedFeed, ok := s.Cache[feed.Url]
+	if !ok {
+		return true
+	}
+
+	return time.Since(cachedFeed.LastCachedAt) >= s.CacheInterval
 }
 
-func (scraper *Scraper) fetchDataFromFeed(feed database.Feed) (FeedData, error) {
+func (s *Scraper) checkCache(feed database.Feed) error {
+	s.mux.Lock()
+	defer s.mux.Unlock()
+
+	if !s.shouldFetch(feed) {
+		return CacheHitError{}
+	}
+
+	cachedFeed := s.Cache[feed.Url]
+	cachedFeed.LastCachedAt = time.Now().UTC()
+	s.Cache[feed.Url] = cachedFeed // Update the cache time first so others know it's already being cached
+
+	return nil
+}
+
+func (s *Scraper) updateCacheData(feed database.Feed, feedData FeedData) {
+	s.mux.Lock()
+	defer s.mux.Unlock()
+
+	cachedFeed := s.Cache[feed.Url]
+	cachedFeed.Data = feedData
+	s.Cache[feed.Url] = cachedFeed // Update the cache data when we finally get it
+}
+
+func (s *Scraper) fetchDataFromFeed(feed database.Feed) (FeedData, error) {
+	err := s.checkCache(feed)
+	if err != nil {
+		// Cache hit
+		_, markErr := s.Config.DB.MarkFeedFetched(context.Background(), feed.ID)
+		if markErr != nil {
+			log.Printf("Error marking feed as fetched: %v\n", markErr)
+		}
+		return FeedData{}, err
+	}
+
 	req, err := http.NewRequest("GET", feed.Url, nil)
 	if err != nil {
 		return FeedData{}, errors.New("failed to create GET request")
-	}
-
-	if match, ok := scraper.Cache[feed.Url]; ok {
-		if !scraper.shouldFetch(feed) {
-			// Feed is cached and shouldn't fetch yet
-			log.Println("Cache hit")
-			return match, nil
-
-		}
 	}
 
 	resp, err := http.DefaultClient.Do(req)
@@ -70,9 +116,9 @@ func (scraper *Scraper) fetchDataFromFeed(feed database.Feed) (FeedData, error) 
 
 	feedData, err := parseXML(resp.Body)
 
-	scraper.Cache[feed.Url] = feedData
+	s.updateCacheData(feed, feedData)
 
-	_, err = scraper.Config.DB.MarkFeedFetched(context.Background(), feed.ID)
+	_, err = s.Config.DB.MarkFeedFetched(context.Background(), feed.ID)
 	if err != nil {
 		log.Printf("Error marking feed as fetched: %v\n", err)
 	}
@@ -91,7 +137,7 @@ func parseXML(xmlData io.Reader) (FeedData, error) {
 	return feedData, nil
 }
 
-func (scraper *Scraper) Start(interval time.Duration, numFeeds int) chan bool {
+func (s *Scraper) Start(interval time.Duration, numFeeds int) chan bool {
 	ticker := time.NewTicker(interval)
 	done := make(chan bool)
 
@@ -103,7 +149,7 @@ func (scraper *Scraper) Start(interval time.Duration, numFeeds int) chan bool {
 				return
 
 			case <-ticker.C:
-				scraper.scrape(numFeeds)
+				s.scrape(numFeeds)
 			}
 		}
 	}()
@@ -111,9 +157,9 @@ func (scraper *Scraper) Start(interval time.Duration, numFeeds int) chan bool {
 	return done
 }
 
-func (scraper *Scraper) scrape(numFeeds int) {
+func (s *Scraper) scrape(numFeeds int) {
 	log.Println("Finding feeds in need of fetching...")
-	feedsToFetch, err := scraper.Config.DB.GetNextFeedsToFetch(context.Background(), int32(numFeeds))
+	feedsToFetch, err := s.Config.DB.GetNextFeedsToFetch(context.Background(), int32(numFeeds))
 	if err != nil {
 		log.Printf("Error getting feeds to fetch: %v", err)
 		return
@@ -133,13 +179,18 @@ func (scraper *Scraper) scrape(numFeeds int) {
 			defer wg.Done()
 
 			log.Println("Fetching feed from ", feed.Url)
-			feedData, err := scraper.fetchDataFromFeed(feed)
+			feedData, err := s.fetchDataFromFeed(feed)
 			if err != nil {
+				if errors.Is(err, CacheHitError{}) {
+					log.Println(err)
+					return
+				}
+
 				log.Printf("Error fetching %s: %v\n", feed.Url, err)
 				return
 			}
 
-			processFeed(feedData)
+			s.processFeed(feedData, feed.ID)
 		}(feed)
 	}
 
@@ -147,9 +198,74 @@ func (scraper *Scraper) scrape(numFeeds int) {
 	log.Println("Finished processing feeds. Waiting for next cycle...")
 }
 
-func processFeed(data FeedData) {
-	// for i, entry := range data.Items {
-	// 	fmt.Printf("%d > %s\n", i, entry.Title)
-	// }
+func parsePubDate(pubDate string) (time.Time, error) {
+	formats := []string{
+		time.RFC1123,
+		time.RFC1123Z,
+	}
+
+	var converted *time.Time
+	for _, format := range formats {
+		result, err := time.Parse(format, pubDate)
+		if err == nil {
+			converted = new(time.Time)
+			*converted = result
+			break
+		}
+	}
+
+	if converted == nil {
+		return time.Time{}, fmt.Errorf("Failed to convert date from string:, %s", pubDate)
+	}
+
+	return *converted, nil
+}
+
+func (s *Scraper) processFeed(data FeedData, feedID uuid.UUID) {
 	fmt.Printf("Found %d entries\n", len(data.Items))
+
+	for _, item := range data.Items {
+		currentTime := time.Now().UTC()
+
+		pubDate, err := parsePubDate(item.PubDate)
+		if err != nil {
+			log.Println(err)
+			log.Println("Skipping Post:", item.Title)
+			continue
+		}
+
+		description := sql.NullString{
+			String: "",
+			Valid:  false,
+		}
+
+		if item.Description != nil {
+			description.String = *item.Description
+			description.Valid = true
+		}
+
+		_, err = s.Config.DB.CreatePost(context.Background(), database.CreatePostParams{
+			ID:          uuid.New(),
+			CreatedAt:   currentTime,
+			UpdatedAt:   currentTime,
+			Title:       item.Title,
+			Url:         item.Link,
+			Description: description,
+			PublishedAt: pubDate,
+			FeedID:      feedID,
+		})
+		if err != nil {
+			if err, ok := err.(*pq.Error); ok {
+				if err.Code.Name() == "unique_violation" {
+					log.Println("Post with URL already in DB, skipping.")
+					continue
+				}
+			}
+
+			log.Println("Failed to save Post to DB:", item.Title)
+			continue
+		}
+
+		log.Println("Saved Post to DB:", item.Title)
+	}
 }
