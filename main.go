@@ -36,7 +36,7 @@ func main() {
 		Cache:         make(map[string]scraper.CachedFeed),
 		CacheInterval: 30 * time.Minute,
 	}
-	scraper.Start(10*time.Second, 2)
+	scraper.Start(60*time.Second, 10)
 
 	mux := http.NewServeMux()
 
@@ -57,6 +57,8 @@ func main() {
 	mux.HandleFunc("POST /v1/feed_follows", apiConfig.MiddleWareAuth(apiConfig.PostFeedFollowsHandler))
 	mux.HandleFunc("DELETE /v1/feed_follows/{feedFollowID}", apiConfig.MiddleWareAuth(apiConfig.DeleteFeedFollowHandler))
 	mux.HandleFunc("GET /v1/feed_follows", apiConfig.MiddleWareAuth(apiConfig.GetFeedFollowsHandler))
+
+	mux.HandleFunc("GET /v1/posts", apiConfig.MiddleWareAuth(apiConfig.GetPostsHandler))
 
 	log.Printf("Starting server on port %s\n", port)
 	server.ListenAndServe()

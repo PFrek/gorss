@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"github.com/PFrek/gorss/internal/database"
@@ -19,6 +20,16 @@ func extractBody(req *http.Request, v any) error {
 	}
 
 	return nil
+}
+
+func extractQuery(req *http.Request, key string) (string, error) {
+	query := req.URL.Query().Get(key)
+
+	if query == "" {
+		return "", fmt.Errorf("Query param not found: %s", key)
+	}
+
+	return query, nil
 }
 
 func respondWithJSON(w http.ResponseWriter, code int, payload interface{}) {

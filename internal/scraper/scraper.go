@@ -218,7 +218,7 @@ func parsePubDate(pubDate string) (time.Time, error) {
 		return time.Time{}, fmt.Errorf("Failed to convert date from string:, %s", pubDate)
 	}
 
-	return *converted, nil
+	return converted.UTC(), nil
 }
 
 func (s *Scraper) processFeed(data FeedData, feedID uuid.UUID) {
